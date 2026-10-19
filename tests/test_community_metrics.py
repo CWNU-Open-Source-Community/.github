@@ -2,10 +2,28 @@ from datetime import date
 import unittest
 from unittest.mock import patch
 
-from scripts.community_metrics import repository_activity, streaks, wakatime
+from scripts.community_metrics import public_member_profiles, repository_activity, streaks, wakatime
 
 
 class CommunityMetricsTests(unittest.TestCase):
+    def test_member_profiles_are_deduplicated_and_exclude_private_repositories(self):
+        class FakeGitHub:
+            def pages(self, path):
+                login, kind = path.split("/")[1:]
+                if kind == "following":
+                    return [{"login": "shared"}, {"login": login}]
+                if kind == "starred":
+                    return [{"full_name": "public/project", "private": False}, {"full_name": "private/project", "private": True}]
+                return [{"login": "community"}]
+            def graphql(self, query, **variables):
+                return {"user": {"watching": {
+                    "nodes": [{"nameWithOwner": "public/project", "isPrivate": False}, {"nameWithOwner": "private/project", "isPrivate": True}],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }}}
+        result = public_member_profiles(FakeGitHub(), [{"login": "first"}, {"login": "second"}])
+        self.assertEqual(len(result["following"]), 3)
+        self.assertEqual((result["starred"], result["watching"], result["organizations"]), (1, 1, 1))
+
     def test_wakatime_stale_zero_is_processing_instead_of_recorded_zero(self):
         with patch("scripts.community_metrics.request", return_value=(200, {"data": {"is_up_to_date": False, "total_seconds": 0}})):
             self.assertEqual(wakatime("test-token")["state"], "processing")

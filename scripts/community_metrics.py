@@ -153,6 +153,35 @@ def external_contributions(api, members):
     return sorted(({"name": key, **value} for key, value in totals.items()), key=lambda item: item["commits"] + item["prs"], reverse=True)[:8]
 
 
+def public_member_profiles(api, members):
+    following, starred, watching, organizations = {}, {}, {}, {}
+    for member in members:
+        login = member["login"]
+        for item in api.pages(f"users/{login}/following"):
+            following[item["login"].lower()] = item
+        for item in api.pages(f"users/{login}/starred"):
+            if not item["private"]:
+                starred[item["full_name"].lower()] = item
+        for item in api.pages(f"users/{login}/orgs"):
+            organizations[item["login"].lower()] = item
+        cursor = None
+        while True:
+            connection = api.graphql("""
+              query($login:String!,$cursor:String) { user(login:$login) {
+                watching(first:100,after:$cursor) {
+                  nodes { nameWithOwner isPrivate } pageInfo { hasNextPage endCursor }
+                }
+              } }
+            """, login=login, cursor=cursor)["user"]["watching"]
+            for item in connection["nodes"]:
+                if not item["isPrivate"]:
+                    watching[item["nameWithOwner"].lower()] = item
+            if not connection["pageInfo"]["hasNextPage"]:
+                break
+            cursor = connection["pageInfo"]["endCursor"]
+    return {"following": list(following.values()), "starred": len(starred), "watching": len(watching), "organizations": len(organizations)}
+
+
 def avatar(url):
     # Avatar requests never receive a GitHub or WakaTime credential.
     if urllib.parse.urlsplit(url).hostname != "avatars.githubusercontent.com":
@@ -188,8 +217,8 @@ def collect(api, waka_token, now=None):
     repositories = [repo for repo in api.pages(f"orgs/{ORG}/repos?type=public") if not repo["fork"]]
     members = api.pages(f"orgs/{ORG}/public_members")
     followers = api.pages(f"users/{ORG}/followers")
-    following = api.pages(f"users/{ORG}/following")
-    starred = api.pages(f"users/{ORG}/starred")
+    profiles = public_member_profiles(api, members)
+    following = profiles["following"]
     social = api.graphql("""
       query($login:String!) { organization(login:$login) {
         packages { totalCount }
@@ -211,7 +240,8 @@ def collect(api, waka_token, now=None):
         "generated_at": now.isoformat(), "start": start.isoformat(), "org": org,
         "avatar": pictures[0], "followers": followers, "following": following,
         "people_avatars": pictures[1:], "public_members": len(members), "social": social,
-        "starred": len(starred), "repositories": len(repositories),
+        "starred": profiles["starred"], "watching": profiles["watching"],
+        "organizations": profiles["organizations"], "repositories": len(repositories),
         "stars": sum(repo["stargazers_count"] for repo in repositories),
         "forks": sum(repo["forks_count"] for repo in repositories),
         "watchers": sum(item["watchers"]["totalCount"] for item in activity),
@@ -294,7 +324,8 @@ def render(data):
     field(254, 106, "Community stats", "people", BLUE)
     activity = data["activity"]
     left = [(f'{activity["commits"]:,} Commits', "commit"), (f'{activity["reviewed"]:,} Pull requests reviewed', "comment"), (f'{activity["prs"]:,} Pull requests opened', "pr"), (f'{activity["issues"]:,} Issues opened', "circle"), (f'{activity["comments"]:,} Issue comments', "comment")]
-    right = [(f'{data["public_members"]} public members', "people"), (f'Following {len(data["following"])} users', "people"), (f'Sponsoring {data["social"]["sponsorshipsAsSponsor"]["totalCount"]} accounts', "heart"), (f'Starred {data["starred"]} repositories', "star"), ("Watching —", "eye")]
+    organization_label = "organization" if data["organizations"] == 1 else "organizations"
+    right = [(f'Members of {data["organizations"]} {organization_label}', "people"), (f'Following {len(data["following"])} accounts', "people"), (f'Sponsoring {data["social"]["sponsorshipsAsSponsor"]["totalCount"]} accounts', "heart"), (f'Starred {data["starred"]} repositories', "star"), (f'Watching {data["watching"]} repositories', "eye")]
     for i, ((label, kind), (other, other_kind)) in enumerate(zip(left, right)):
         field(12, 127+i*20, label, kind)
         field(254, 127+i*20, other, other_kind)
@@ -350,7 +381,8 @@ def render(data):
     y += 190
     for group, label in (("followers", "followers"), ("following", "followed")):
         people = data[group]
-        heading(y, f"{len(people)} {label}", "people")
+        scope = " · public members" if group == "following" else ""
+        heading(y, f"{len(people)} {label}{scope}", "people")
         image_offset = 0 if group == "followers" else min(12, len(data["followers"]))
         for i, person in enumerate(people[:12]):
             image(12+i*37, y+9, 28, data["people_avatars"][image_offset+i], person["login"])
@@ -383,7 +415,7 @@ def render(data):
         field(12, y+25, state, "clock")
         y += 44
     y += 36
-    text(468, y, "GitHub: public community repositories / public member contributions", size=9, extra='text-anchor="end"')
+    text(468, y, "GitHub: public repositories / public members' profiles and contributions", size=9, extra='text-anchor="end"')
     text(468, y+15, "WakaTime: Qiyuanqiii's personal coding activity", size=9, extra='text-anchor="end"')
     text(468, y+30, f'Last updated {now:%d %b %Y, %H:%M} (UTC+8)', size=9, extra='text-anchor="end"')
     height = y + 43
@@ -394,7 +426,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, help="Render a saved collection without making API requests")
     parser.add_argument("--save-data", type=Path)
-    parser.add_argument("--output", type=Path, default=Path("profile/community-metrics.svg"))
+    parser.add_argument("--output", type=Path, default=Path("profile/community-activity.svg"))
     args = parser.parse_args()
     if args.data:
         data = json.loads(args.data.read_text(encoding="utf-8"))

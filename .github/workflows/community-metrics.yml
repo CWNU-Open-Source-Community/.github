@@ -49,7 +49,7 @@ jobs:
 
       - name: Commit community statistics
         run: |
-          git add profile/community-metrics.svg
+          git add profile/community-activity.svg
           if git diff --cached --quiet; then
             exit 0
           fi
