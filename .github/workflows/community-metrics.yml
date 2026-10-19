@@ -56,4 +56,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'chore: update community metrics'
+          python3 scripts/community_metrics.py --update-reference "$(git rev-parse HEAD)"
+          git add profile/README.md
+          git commit -m 'chore: refresh community card reference'
           git push
