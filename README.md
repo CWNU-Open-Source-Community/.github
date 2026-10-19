@@ -6,14 +6,14 @@
 
 [`CWNU Community Metrics`](.github/workflows/community-metrics.yml) 运行
 [`scripts/community_metrics.py`](scripts/community_metrics.py)，生成
-`profile/community-metrics.svg`，展示社区活动、仓库统计、公开成员外部贡献、3D 提交日历、关注者，以及 Qiyuanqiii 的个人 WakaTime 数据。
+`profile/community-activity.svg`，展示社区活动、仓库统计、公开成员外部贡献、3D 提交日历、关注者，以及 Qiyuanqiii 的个人 WakaTime 数据。
 
 ### 数据口径
 
 - Activity 和 3D 日历统计当前公开、非 fork 仓库的默认分支；包含仓库迁入组织前的历史。日历展示最近 182 天，按 UTC+8 分日。
 - PR 审阅数指至少收到一次 review 的 PR 数；Issue comments 包含 Issue 与 PR 会话评论。
 - Notable contributions 汇总公开成员过去一年对其他组织的公开 Commit / PR 贡献。GitHub 对每位成员、每种贡献类型最多返回 100 个仓库。
-- Followers 使用 GitHub REST API 的实际关注者列表；公开成员与关注者分别统计。组织没有个人 Watching 数据，显示为 `—`。
+- Followers 使用组织的实际关注者列表。Followed、Starred、Watching 和组织成员关系使用公开成员的公开列表去重汇总；Followed 头像行明确标注 `public members`，不把成员关注行为算作组织账号行为。
 - WakaTime 明确标注为 Qiyuanqiii 的个人数据，包含年度编码时长、日均时长、语言、编辑器和操作系统，不归入社区总时长。
 
 ### 首次配置
