@@ -1,5 +1,7 @@
 
 <div align="center">
+  
+<img width="200" height="200" alt="image" src="https://github.com/user-attachments/assets/20a17aaf-3923-4c4b-8118-42c7ee831177" />
 
 # CWNU Open-Source Community
 
