@@ -10,6 +10,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import subprocess
 import urllib.error
 import urllib.parse
@@ -227,7 +228,7 @@ def collect(api, waka_token, now=None):
     """, login=ORG)["organization"]
     with ThreadPoolExecutor(max_workers=4) as pool:
         activity = list(pool.map(lambda repo: repository_activity(api, repo, since), repositories))
-        pictures = list(pool.map(avatar, [org["avatar_url"]] + [item["avatar_url"] for item in (followers[:12] + following[:12])]))
+        pictures = list(pool.map(avatar, [org["avatar_url"]] + [item["avatar_url"] for item in (followers[:12] + members[:12])]))
     days, counts = Counter(), Counter()
     for item in activity:
         days.update(item["days"])
@@ -238,7 +239,7 @@ def collect(api, waka_token, now=None):
     licenses = Counter(repo["license"]["spdx_id"] for repo in repositories if repo.get("license") and repo["license"]["spdx_id"] != "NOASSERTION")
     return {
         "generated_at": now.isoformat(), "start": start.isoformat(), "org": org,
-        "avatar": pictures[0], "followers": followers, "following": following,
+        "avatar": pictures[0], "followers": followers, "following": following, "members": members,
         "people_avatars": pictures[1:], "public_members": len(members), "social": social,
         "starred": profiles["starred"], "watching": profiles["watching"],
         "organizations": profiles["organizations"], "repositories": len(repositories),
@@ -379,10 +380,9 @@ def render(data):
     for offset, label, kind, color in [(40, "Commits streaks", "calendar", BLUE), (60, f"Current streak {current} days", "clock", GRAY), (80, f"Best streak {best} days", "chart", GRAY), (111, "Commits per day", "commit", BLUE), (131, f"Highest in a day at {maximum}", "chart", GRAY), (151, f"Average per day at ~{average:.2f}", "chart", GRAY)]:
         field(254, y+offset, label, kind, color)
     y += 190
-    for group, label in (("followers", "followers"), ("following", "followed")):
+    for group, label in (("followers", "Followers"), ("members", "Members")):
         people = data[group]
-        scope = " · public members" if group == "following" else ""
-        heading(y, f"{len(people)} {label}{scope}", "people")
+        heading(y, f"{len(people)} {label}", "people")
         image_offset = 0 if group == "followers" else min(12, len(data["followers"]))
         for i, person in enumerate(people[:12]):
             image(12+i*37, y+9, 28, data["people_avatars"][image_offset+i], person["login"])
@@ -422,12 +422,27 @@ def render(data):
     return f'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="{height}" viewBox="0 0 480 {height}" role="img" aria-label="CWNU community activity"><rect width="480" height="{height}" fill="#fff"/><style>text{{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif}}</style>' + "".join(parts) + "</svg>"
 
 
+def update_reference(revision, readme=Path("profile/README.md")):
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("The card reference requires a full commit SHA")
+    prefix = f"https://raw.githubusercontent.com/{ORG}/.github/"
+    pattern = re.escape(prefix) + r"(?:main|[0-9a-f]{40})/profile/community-activity\.svg(?:\?[^\s\"<>]*)?"
+    content, count = re.subn(pattern, prefix + revision + "/profile/community-activity.svg", readme.read_text(encoding="utf-8"))
+    if count != 1:
+        raise ValueError(f"Expected one community card reference, found {count}")
+    readme.write_text(content, encoding="utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, help="Render a saved collection without making API requests")
     parser.add_argument("--save-data", type=Path)
     parser.add_argument("--output", type=Path, default=Path("profile/community-activity.svg"))
+    parser.add_argument("--update-reference", metavar="COMMIT_SHA", help="Point the README card at an immutable asset commit")
     args = parser.parse_args()
+    if args.update_reference:
+        update_reference(args.update_reference)
+        return
     if args.data:
         data = json.loads(args.data.read_text(encoding="utf-8"))
     else:

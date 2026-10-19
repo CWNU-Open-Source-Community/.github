@@ -1,11 +1,23 @@
 from datetime import date
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from scripts.community_metrics import public_member_profiles, repository_activity, streaks, wakatime
+from scripts.community_metrics import public_member_profiles, repository_activity, streaks, update_reference, wakatime
 
 
 class CommunityMetricsTests(unittest.TestCase):
+    def test_card_reference_updates_without_changing_other_images(self):
+        prefix = "https://raw.githubusercontent.com/CWNU-Open-Source-Community/.github/"
+        original = f'<img src="{prefix}main/profile/community-activity.svg?v=2" width="420" />\n![Logo](https://example.com/logo.svg)\n'
+        with TemporaryDirectory() as folder:
+            readme = Path(folder) / "README.md"
+            readme.write_text(original, encoding="utf-8")
+            for revision in ("a" * 40, "b" * 40):
+                update_reference(revision, readme)
+                self.assertEqual(readme.read_text(encoding="utf-8"), original.replace("main/profile/community-activity.svg?v=2", revision + "/profile/community-activity.svg"))
+
     def test_member_profiles_are_deduplicated_and_exclude_private_repositories(self):
         class FakeGitHub:
             def pages(self, path):
