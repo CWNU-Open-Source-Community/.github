@@ -81,7 +81,6 @@ def repository_activity(api, repo, since):
         repository(owner:$owner,name:$name) {
           isPrivate releases { totalCount } watchers { totalCount }
           defaultBranchRef { target { ... on Commit { history { totalCount } } } }
-          languages(first:100) { edges { size node { name color } } }
         }
       }
     """, owner=owner, name=name)["repository"]
@@ -112,7 +111,7 @@ def repository_activity(api, repo, since):
     for field in ("issues", "pullRequests"):
         cursor = None
         while True:
-            reviews = "reviews { totalCount }" if field == "pullRequests" else ""
+            reviews = "reviews(states:[APPROVED,CHANGES_REQUESTED,COMMENTED,DISMISSED]) { totalCount }" if field == "pullRequests" else ""
             connection = api.graphql("""
               query($owner:String!,$name:String!,$cursor:String) {
                 repository(owner:$owner,name:$name) {
@@ -182,6 +181,7 @@ def wakatime(token):
 
 def collect(api, waka_token, now=None):
     now = now or datetime.now(TZ)
+    personal_wakatime = wakatime(waka_token)
     start = now.date() - timedelta(days=181)
     since = datetime.combine(start, datetime.min.time(), TZ).isoformat()
     org = api.rest(f"users/{ORG}")
@@ -199,14 +199,10 @@ def collect(api, waka_token, now=None):
     with ThreadPoolExecutor(max_workers=4) as pool:
         activity = list(pool.map(lambda repo: repository_activity(api, repo, since), repositories))
         pictures = list(pool.map(avatar, [org["avatar_url"]] + [item["avatar_url"] for item in (followers[:12] + following[:12])]))
-    days, counts, languages, colors = Counter(), Counter(), Counter(), {}
+    days, counts = Counter(), Counter()
     for item in activity:
         days.update(item["days"])
         counts.update(item["activity"])
-        for language in item["languages"]["edges"]:
-            name = language["node"]["name"]
-            languages[name] += language["size"]
-            colors[name] = language["node"]["color"] or "#9be9a8"
     notable = external_contributions(api, members)
     for item in notable:
         item["avatar"] = avatar(api.rest(f'users/{item["name"]}')["avatar_url"])
@@ -225,8 +221,7 @@ def collect(api, waka_token, now=None):
         "activity": dict(counts), "days": dict(days),
         "active_repositories": sum(bool(item["days"]) for item in activity),
         "notable": notable,
-        "languages": [{"name": name, "bytes": size, "color": colors[name]} for name, size in languages.most_common(6)],
-        "wakatime": wakatime(waka_token),
+        "wakatime": personal_wakatime,
     }
 
 
