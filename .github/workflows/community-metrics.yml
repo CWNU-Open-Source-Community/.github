@@ -8,6 +8,8 @@ on:
   push:
     paths:
       - .github/workflows/community-metrics.yml
+      - scripts/community_metrics.py
+      - tests/test_community_metrics.py
 
 concurrency:
   group: community-metrics-${{ github.ref }}
@@ -31,31 +33,27 @@ jobs:
             exit 1
           fi
 
-      - name: Generate community statistics
-        uses: lowlighter/metrics@65836723097537a54cd8eb90f61839426b4266b6 # v3.34
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          token: ${{ secrets.METRICS_TOKEN }}
-          user: CWNU-Open-Source-Community
-          template: classic
-          filename: profile/community-metrics.svg
-          base: header, repositories, metadata
-          config_timezone: Asia/Shanghai
-          config_octicon: yes
+          ref: ${{ github.ref_name }}
 
-          plugin_languages: yes
-          plugin_languages_limit: 6
-          plugin_languages_details: percentage
+      - name: Check generator
+        run: python3 -m unittest discover -s tests -v
 
-          plugin_stargazers: yes
-          plugin_stargazers_days: 30
-          plugin_stargazers_charts: yes
-          plugin_stargazers_charts_type: graph
+      - name: Generate community statistics
+        env:
+          GH_TOKEN: ${{ secrets.METRICS_TOKEN }}
+          WAKATIME_TOKEN: ${{ secrets.WAKATIME_TOKEN }}
+        run: python3 scripts/community_metrics.py
 
-          plugin_followup: yes
-          plugin_followup_sections: repositories
-
-          plugins_errors_fatal: yes
-          output_action: commit
-          committer_token: ${{ github.token }}
-          committer_branch: ${{ github.ref_name }}
-          committer_message: "chore: update community metrics"
+      - name: Commit community statistics
+        run: |
+          git add profile/community-metrics.svg
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: update community metrics'
+          git push
