@@ -34,8 +34,17 @@ def request(url, token=None, payload=None):
             body = response.read()
             return response.status, json.loads(body) if body else None
     except urllib.error.HTTPError as error:
-        # Do not include response bodies or credentials in workflow logs.
-        raise RuntimeError(f"HTTP {error.code}: {urllib.parse.urlsplit(url).path}") from None
+        detail = ""
+        if urllib.parse.urlsplit(url).hostname == "api.wakatime.com":
+            try:
+                result = json.loads(error.read())
+                message = result.get("error") or result.get("errors") or result.get("message")
+                detail = ": " + json.dumps(message, ensure_ascii=True)[:500]
+                if token:
+                    detail = detail.replace(token, "[redacted]")
+            except (ValueError, AttributeError):
+                pass
+        raise RuntimeError(f"HTTP {error.code}: {urllib.parse.urlsplit(url).path}{detail}") from None
 
 
 class GitHub:
