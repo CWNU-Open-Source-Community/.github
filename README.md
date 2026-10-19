@@ -24,6 +24,8 @@
 
 接入 WakaTime：在 [WakaTime OAuth](https://wakatime.com/oauth) 获取有 `read_stats` 权限的个人令牌，添加为仓库 Secret `WAKATIME_TOKEN`。在编辑器安装 WakaTime 插件后开始积累数据；刚注册时可能没有编码记录。尚未接入或服务正在计算统计时，卡片会显示相应状态。
 
+新账号需要在 WakaTime 设置的“偏好”中保存时区，例如 `Asia/Hong_Kong` 或 `Asia/Shanghai`；缺少时区时，统计接口会返回 `User is missing a timezone`。
+
 工作流每天北京时间 11:00 定时更新，也支持手动运行。定时任务可能延迟启动。
 令牌过期时更新同名 Secret，然后重新运行工作流。
 

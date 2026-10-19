@@ -167,7 +167,7 @@ def wakatime(token):
     if not token:
         return {"state": "not-connected", "label": "Qiyuanqiii"}
     status, result = request("https://api.wakatime.com/api/v1/users/current/stats/last_year", token)
-    if status == 202:
+    if status == 202 or result.get("data", {}).get("is_up_to_date") is False:
         return {"state": "processing", "label": "Qiyuanqiii"}
     stats = result["data"]
     return {
@@ -369,6 +369,9 @@ def render(data):
         field(254, y+65, f'Using {top("operating_systems")}', "box")
         y += 98
         text(240, y, "Language activity", BLUE, 14, extra='text-anchor="middle"')
+        if not waka["languages"]:
+            y += 21
+            text(240, y, "No coding activity recorded yet", size=12, extra='text-anchor="middle"')
         for item in sorted(waka["languages"], key=lambda item: item["total_seconds"], reverse=True)[:5]:
             y += 18
             text(167, y, item["name"], size=11, extra='text-anchor="end"')

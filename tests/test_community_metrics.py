@@ -1,10 +1,15 @@
 from datetime import date
 import unittest
+from unittest.mock import patch
 
-from scripts.community_metrics import repository_activity, streaks
+from scripts.community_metrics import repository_activity, streaks, wakatime
 
 
 class CommunityMetricsTests(unittest.TestCase):
+    def test_wakatime_stale_zero_is_processing_instead_of_recorded_zero(self):
+        with patch("scripts.community_metrics.request", return_value=(200, {"data": {"is_up_to_date": False, "total_seconds": 0}})):
+            self.assertEqual(wakatime("test-token")["state"], "processing")
+
     def test_streak_keeps_yesterday_when_today_has_no_commits(self):
         days = {"2026-10-16": 2, "2026-10-17": 3, "2026-10-18": 1}
         current, best, highest, average = streaks(days, date(2026, 10, 19), date(2026, 10, 15))
