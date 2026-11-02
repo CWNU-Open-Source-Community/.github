@@ -48,7 +48,7 @@
 ## 社区数据总览
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CWNU-Open-Source-Community/.github/0a41c94aef05294f86e1515b5420bf05ab0857a1/profile/community-activity.svg" alt="CWNU 社区活动、贡献日历、关注者与个人 WakaTime 统计" width="420" />
+  <img src="https://raw.githubusercontent.com/CWNU-Open-Source-Community/.github/3bea0a5d475d05879297cae3a5239c9ce2e180f6/profile/community-activity.svg" alt="CWNU 社区活动、贡献日历、关注者与个人 WakaTime 统计" width="420" />
 </p>
 
 ---
